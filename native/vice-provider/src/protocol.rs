@@ -105,14 +105,14 @@ pub fn encode_canonical(value: &Value) -> Result<Vec<u8>> {
     raw_encode(&canonicalize(value)?)
 }
 
-fn as_map(value: &Value, label: &str) -> Result<&[(Value, Value)]> {
+fn as_map<'a>(value: &'a Value, label: &str) -> Result<&'a [(Value, Value)]> {
     match value {
         Value::Map(entries) => Ok(entries.as_slice()),
         _ => Err(error(format!("{label} must be a map"))),
     }
 }
 
-fn as_array(value: &Value, label: &str) -> Result<&[Value]> {
+fn as_array<'a>(value: &'a Value, label: &str) -> Result<&'a [Value]> {
     match value {
         Value::Array(values) => Ok(values.as_slice()),
         _ => Err(error(format!("{label} must be an array"))),
@@ -172,7 +172,7 @@ fn int_key(value: &Value) -> Option<i64> {
     }
 }
 
-fn get_int<'a>(entries: &'a [(Value, Value)], key: i64) -> Option<&'a Value> {
+fn get_int(entries: &[(Value, Value)], key: i64) -> Option<&Value> {
     entries
         .iter()
         .find_map(|(candidate, value)| (int_key(candidate) == Some(key)).then_some(value))
