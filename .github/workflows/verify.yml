@@ -31,4 +31,4 @@ jobs:
 
       - name: Run verifier tests
         working-directory: reference/python
-        run: python -m unittest -v test_dade_verify.py
+        run: python -m unittest discover -v -p "test_*.py"
