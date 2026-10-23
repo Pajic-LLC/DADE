@@ -1,0 +1,48 @@
+; DADE 1 draft deed payload
+; This schema describes the CBOR payload carried inside COSE_Sign1.
+; It does not define owner proof, device authorization, transfer, lending, or recovery.
+
+dade-deed = {
+  1 => 1,                         ; version
+  2 => bytes .size 16,            ; deed_id
+  3 => asset-id,                  ; asset_id
+  4 => bytes .size 16,            ; issuer_id
+  5 => bytes .size 16,            ; owner_id
+  6 => rights,
+  7 => uint,                      ; issued_at, Unix seconds
+  8 => bytes .size 32,            ; terms_sha256
+  ? 9 => terms-uri,
+  ? 10 => edition,
+  ? 11 => [1*32 uint],            ; critical payload labels
+  * uint => any                   ; extension fields
+}
+
+asset-id = text .size (1..255)
+terms-uri = text .size (1..2048)
+edition = text .size (1..128)
+
+rights = {
+  1 => use-mode,
+  2 => offline-mode,
+  3 => bool,                      ; personal_devices
+  4 => bool,                      ; gift
+  5 => bool,                      ; resale
+  6 => bool,                      ; lend
+  ? 7 => [1*32 platform],
+  ? 8 => uint,                    ; use_until, required when use-mode = 1
+  ? 9 => [1*32 service-dependency],
+  * uint => any
+}
+
+use-mode = 0 / 1 / 2
+; 0 permanent
+; 1 until a fixed time
+; 2 subscription or service term
+
+offline-mode = 0 / 1 / 2
+; 0 no offline core use
+; 1 full offline core use after valid setup
+; 2 partial offline use
+
+platform = text .size (1..32)
+service-dependency = text .size (1..128)
