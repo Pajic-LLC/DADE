@@ -1,0 +1,28 @@
+; DADE 1 trust snapshot payloads
+; The payload is wrapped in COSE_Sign1 by the authority for its trust domain.
+
+owner-trust-snapshot = {
+  1: 1,                    ; version
+  2: bstr .size 16,        ; owner_id
+  3: uint,                 ; sequence
+  4: uint,                 ; issued_at
+  5: [* revoked-controller]
+}
+
+revoked-controller = {
+  1: bstr .size 16,        ; controller_id
+  2: uint                  ; revoked_at
+}
+
+issuer-trust-snapshot = {
+  1: 1,                    ; version
+  2: bstr .size 16,        ; issuer_id
+  3: uint,                 ; sequence
+  4: uint,                 ; issued_at
+  5: [* rejected-signing-key]
+}
+
+rejected-signing-key = {
+  1: bstr .size 8,         ; signing key_id
+  2: uint                  ; reject_from
+}
