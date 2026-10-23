@@ -1,0 +1,13 @@
+; DADE 1 recovery bundle draft
+
+recovery-bundle = {
+  1: 1,             ; version
+  2: bstr .size 16, ; owner_id
+  3: bstr .size 12, ; AES-GCM nonce
+  4: bstr,          ; encrypted private data and authentication tag
+}
+
+recovery-private-data = {
+  1: 1,             ; version
+  2: bstr .size 32, ; P-256 owner anchor private value
+}
