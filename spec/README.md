@@ -16,6 +16,7 @@ The specification is intentionally small right now. We are still deciding parts 
 - [DADE identity model](identity-model.md)
 - [Identity credential formats](identity-credentials.md)
 - [Personal device authorization](device-authorization.md)
+- [Device proof](device-proof.md)
 
 The logical deed model and first signed wire format now have a working reference verifier.
 
@@ -23,7 +24,9 @@ The identity drafts define a separate owner anchor, controller keys, and persona
 
 The first technical profile uses deterministic CBOR, COSE_Sign1, and ES256. The wire-format draft also proposes `.ddc` as the three-character portable deed extension.
 
-These choices are still draft until the broader verifier, identity tests, and security review prove them.
+The reference work now includes a complete offline test chain from deed to owner anchor to controller to personal device to a fresh launch proof.
+
+These choices are still draft until broader implementation and security review prove them.
 
 ## Planned sections
 
