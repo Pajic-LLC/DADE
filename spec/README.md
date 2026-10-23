@@ -13,12 +13,17 @@ The specification is intentionally small right now. We are still deciding parts 
 - [Encoding and signature profile](encoding-profile.md)
 - [DADE 1 deed wire format](wire-format.md)
 - [DADE 1 CDDL schema](dade1.cddl)
+- [DADE identity model](identity-model.md)
+- [Identity credential formats](identity-credentials.md)
+- [Personal device authorization](device-authorization.md)
 
-The logical model is now defined well enough to start wire-format and verifier work.
+The logical deed model and first signed wire format now have a working reference verifier.
 
-The first technical profile proposes deterministic CBOR, COSE_Sign1, and ES256. The wire-format draft also proposes `.ddc` as the three-character portable deed extension.
+The identity drafts define a separate owner anchor, controller keys, and personal device keys so a device can use owned content without becoming the owner or receiving the owner's main private key.
 
-These choices are still draft until test vectors and implementation work prove them.
+The first technical profile uses deterministic CBOR, COSE_Sign1, and ES256. The wire-format draft also proposes `.ddc` as the three-character portable deed extension.
+
+These choices are still draft until the broader verifier, identity tests, and security review prove them.
 
 ## Planned sections
 
@@ -55,6 +60,6 @@ DADE should separate the protocol from Pajic's hosted services so an existing de
 
 No protocol version has been frozen.
 
-The first encoding, signature, and wire-format profile is proposed, not final.
+The first encoding, signature, wire-format, identity, and device models are proposed, not final.
 
 No production implementation should claim DADE 1 conformance yet.
