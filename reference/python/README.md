@@ -74,6 +74,20 @@ Every step can be checked from local files and public keys.
 
 No Pajic API or other network request is used by the tests.
 
+## Recovery
+
+`dade_recovery.py` implements the first recovery profile.
+
+It creates an encrypted recovery bundle using AES-256-GCM and a separate random 32-byte recovery secret.
+
+A valid recovery restores the exact same owner anchor. That means the derived owner ID stays unchanged and existing deeds do not need to be reissued.
+
+The tests also prove that the recovered anchor can issue a fresh controller credential for the same owner identity.
+
+A wrong recovery secret or a tampered recovery bundle must fail authentication.
+
+Recovery does not claim that an old controller can be remotely erased while it is offline. Controller revocation is separate work.
+
 ## Tests
 
 ```text
@@ -92,6 +106,11 @@ The tests cover:
 - valid owner and device chain
 - wrong identity anchor
 - wrong launch challenge
+- recovery of the same owner identity
+- controller authorization after recovery
+- wrong recovery secrets
+- tampered recovery bundles
+- tampered recovery owner IDs
 
 ## Scope
 
@@ -121,13 +140,18 @@ The reference verifier currently checks:
 - device ID derivation
 - fresh device proof signatures
 - challenge, asset, right, owner, and device binding
+- encrypted owner-anchor recovery bundles
+- recovery owner-ID continuity
+- recovery bundle authentication
 
 It does not yet check:
 
 - issuer revocation updates
 - issuer root migration
+- controller revocation distribution
 - transfer state
 - lending state
-- recovery state
+- inheritance
+- managed or social recovery policy
 
 Those are separate layers of DADE.
