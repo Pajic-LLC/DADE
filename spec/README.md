@@ -6,6 +6,7 @@ The specification is intentionally small right now. We are still deciding parts 
 
 ## Current drafts
 
+- [Identifiers](identifiers.md)
 - [Digital deed model](deed-model.md)
 - [Rights model](rights.md)
 - [Local verifier contract](verifier-contract.md)
