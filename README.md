@@ -59,6 +59,17 @@ The long-term idea is native support in operating systems and secure hardware. A
 
 DADE 2 is not the current project. DADE 1 comes first.
 
+## Project docs
+
+- [Principles](docs/principles.md)
+- [Terminology](docs/terminology.md)
+- [Security model](docs/security.md)
+- [Open questions](docs/open-questions.md)
+- [Roadmap](ROADMAP.md)
+- [DADE 1 specification area](spec/README.md)
+- [Security reporting](SECURITY.md)
+- [Contributing](CONTRIBUTING.md)
+
 ## Public does not mean free commercial use
 
 This repository is public so the work can be inspected and discussed.
