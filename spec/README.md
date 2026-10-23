@@ -17,14 +17,18 @@ The specification is intentionally small right now. We are still deciding parts 
 - [Identity credential formats](identity-credentials.md)
 - [Personal device authorization](device-authorization.md)
 - [Device proof](device-proof.md)
+- [Issuer trust](issuer-trust.md)
+- [Issuer signing credential](issuer-credential.md)
 
 The logical deed model and first signed wire format now have a working reference verifier.
 
 The identity drafts define a separate owner anchor, controller keys, and personal device keys so a device can use owned content without becoming the owner or receiving the owner's main private key.
 
+The issuer trust drafts separate a stable issuer root from routine deed signing keys. That allows signing-key rotation without changing the issuer identity or invalidating old deeds.
+
 The first technical profile uses deterministic CBOR, COSE_Sign1, and ES256. The wire-format draft also proposes `.ddc` as the three-character portable deed extension.
 
-The reference work now includes a complete offline test chain from deed to owner anchor to controller to personal device to a fresh launch proof.
+The reference work includes a complete offline test chain from issuer root to signing key to deed, then from deed to owner anchor to controller to personal device to a fresh launch proof.
 
 These choices are still draft until broader implementation and security review prove them.
 
@@ -63,6 +67,6 @@ DADE should separate the protocol from Pajic's hosted services so an existing de
 
 No protocol version has been frozen.
 
-The first encoding, signature, wire-format, identity, and device models are proposed, not final.
+The first encoding, signature, wire-format, identity, device, and issuer-trust models are proposed, not final.
 
 No production implementation should claim DADE 1 conformance yet.
