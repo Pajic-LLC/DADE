@@ -107,7 +107,7 @@ def verify_deed(raw: bytes, public_key_pem: bytes, expected_asset: str | None = 
         raise VerificationError("invalid CBOR") from exc
 
     _expect(isinstance(cose, cbor2.CBORTag) and cose.tag == 18, "expected tagged COSE_Sign1")
-    _expect(isinstance(cose.value, list) and len(cose.value) == 4, "invalid COSE_Sign1 structure")
+    _expect(isinstance(cose.value, (list, tuple)) and len(cose.value) == 4, "invalid COSE_Sign1 structure")
 
     protected_bytes, unprotected, payload_bytes, signature = cose.value
 
