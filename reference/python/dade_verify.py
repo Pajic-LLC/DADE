@@ -96,8 +96,13 @@ def _validate_rights(rights: object) -> dict:
 
 def _public_key_id(public_key: ec.EllipticCurvePublicKey) -> bytes:
     numbers = public_key.public_numbers()
-    uncompressed = b"\x04" + numbers.x.to_bytes(32, "big") + numbers.y.to_bytes(32, "big")
-    return hashlib.sha256(uncompressed).digest()[:8]
+    cose_key = {
+        1: 2,
+        -1: 1,
+        -2: numbers.x.to_bytes(32, "big"),
+        -3: numbers.y.to_bytes(32, "big"),
+    }
+    return hashlib.sha256(cbor2.dumps(cose_key, canonical=True)).digest()[:8]
 
 
 def verify_deed(raw: bytes, public_key_pem: bytes, expected_asset: str | None = None) -> VerificationResult:
