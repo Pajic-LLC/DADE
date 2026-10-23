@@ -1,15 +1,12 @@
 # Identifiers
 
-DADE needs stable identifiers for deeds, assets, issuers, owners, and devices.
-
-This document defines the first rules for those identifiers without freezing their final encoded syntax.
+DADE needs stable identifiers for deeds, assets, issuers, owners, controllers, and devices.
 
 ## General rules
 
 Identifiers should be:
 
 - stable
-- opaque where possible
 - safe to compare as exact values
 - independent from display names
 - free of personal information unless there is a strong reason otherwise
@@ -23,9 +20,7 @@ Every deed needs a globally unique identifier.
 
 The deed ID identifies the deed itself, not the owner or asset.
 
-Changing ownership must not require reusing another deed's identifier.
-
-The final identifier format is not fixed yet.
+The first wire-format draft uses a 16-byte value.
 
 ## Asset ID
 
@@ -50,13 +45,21 @@ The issuer ID must be resolvable to trusted public verification material without
 
 Display names can change without changing the underlying issuer identity.
 
+The first wire-format draft uses a 16-byte value. The final issuer trust and identifier construction are still open.
+
 ## Owner ID
 
 The owner ID identifies a DADE identity.
 
-It must not require a legal name, email address, phone number, store username, or device serial number.
+The first DADE 1 identity draft derives this 16-byte value from the identity anchor public key.
 
-The owner ID should remain stable when the person:
+The construction is defined in [identity-credentials.md](identity-credentials.md).
+
+That lets a verifier confirm locally that a presented anchor public key belongs to the owner ID signed into a deed.
+
+The owner ID does not contain a legal name, email address, phone number, store username, or device serial number.
+
+It remains the same when the person:
 
 - changes email address
 - changes store account
@@ -64,17 +67,25 @@ The owner ID should remain stable when the person:
 - replaces a computer
 - changes a display name
 
-The final public-key and recovery model is not fixed yet.
+Changing the identity anchor itself is a separate recovery or identity-migration problem and is not defined yet.
+
+## Controller ID
+
+A controller ID identifies a controller public key authorized by a DADE identity.
+
+The first draft derives a 16-byte controller ID from the controller public key using a DADE-specific hash prefix.
+
+A controller can approve actions only within the scopes granted by its credential.
 
 ## Device ID
 
-A device ID identifies one device authorization target.
+A device ID identifies one DADE device public key.
+
+The first draft derives a 16-byte device ID from that public key using a DADE-specific hash prefix.
 
 A friendly name such as `Gaming PC` is metadata, not the security identity.
 
-Where supported, the device identity should be tied to a device key that cannot simply be copied to another machine.
-
-The final hardware binding rules are not fixed yet.
+Where supported, the private device key should use hardware-backed storage so it cannot simply be copied to another machine.
 
 ## Do not overload identifiers
 
@@ -91,7 +102,7 @@ That could be treated as an account name, contact address, identity, or recovery
 Better:
 
 ```text
-owner_id: <opaque DADE identity reference>
+owner_id: <DADE owner identifier>
 email: <optional account metadata somewhere else>
 ```
 
@@ -109,4 +120,4 @@ VICE
 Leon's Gaming PC
 ```
 
-Those names are for people. They should not be used as the cryptographic identity of the issuer, asset, owner, or device.
+Those names are for people. They should not be used as the cryptographic identity of the issuer, asset, owner, controller, or device.
