@@ -1,0 +1,19 @@
+; DADE 1 issuer signing credential payload
+; Draft. Not a frozen production schema.
+
+issuer-signing-credential = {
+  1: 1,                 ; version
+  2: bstr .size 16,     ; credential_id
+  3: bstr .size 16,     ; issuer_id
+  4: bstr .size 8,      ; signing_key_id
+  5: public-p256-key,   ; signing_key
+  6: uint,              ; valid_from
+  7: uint               ; valid_until
+}
+
+public-p256-key = {
+  1: 2,                 ; kty = EC2
+  -1: 1,                ; crv = P-256
+  -2: bstr .size 32,    ; x
+  -3: bstr .size 32     ; y
+}
