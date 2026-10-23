@@ -1,8 +1,16 @@
 # DADE 1 specification
 
-This directory will hold the technical DADE 1 specification.
+This directory holds the technical DADE 1 specification work.
 
-The specification is intentionally small right now. We are still deciding the ownership and security model, and some implementation details may stay private until Pajic finishes intellectual property review.
+The specification is intentionally small right now. We are still deciding parts of the ownership and security model, and some implementation details may stay private until Pajic finishes intellectual property review.
+
+## Current drafts
+
+- [Digital deed model](deed-model.md)
+- [Rights model](rights.md)
+- [Local verifier contract](verifier-contract.md)
+
+These files define the logical model. They do not freeze a wire format or cryptographic suite yet.
 
 ## Planned sections
 
