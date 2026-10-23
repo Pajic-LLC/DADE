@@ -102,6 +102,29 @@ A compromise cutoff preserves deeds issued before the cutoff and rejects deeds i
 
 The verifier still does not pretend that a permanently offline machine can know about a snapshot it has never received.
 
+## Application verification
+
+`dade_app.py` composes the existing layers into one application-facing `can_use` call.
+
+The caller supplies local DADE artifacts and a fresh challenge. The result is a stable decision code such as:
+
+```text
+owned
+not_owned
+wrong_asset
+untrusted_issuer
+controller_revoked
+issuer_key_revoked
+device_not_authorized
+right_not_granted
+```
+
+Only `owned` allows use.
+
+Applications should make decisions from the result code. The diagnostic detail is for development and logging.
+
+The application path does not fetch anything from Pajic or another live service.
+
 ## Tests
 
 ```text
@@ -130,6 +153,11 @@ The tests cover:
 - issuer compromise cutoffs
 - issuer trust rollback rejection
 - wrong trust-snapshot signing authorities
+- application-level owned decisions
+- application-level not-owned and wrong-asset decisions
+- application-level controller and issuer revocation decisions
+- application-level device proof failures
+- application-level rights failures
 
 ## Scope
 
@@ -167,6 +195,7 @@ The reference verifier currently checks:
 - trust snapshot sequence rollback checks
 - controller revocation state
 - signing-key compromise cutoffs
+- one local application use decision across those layers
 
 It does not yet check:
 
@@ -175,5 +204,6 @@ It does not yet check:
 - lending state
 - inheritance
 - managed or social recovery policy
+- active subscription proof
 
 Those are separate layers of DADE.
