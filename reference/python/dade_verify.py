@@ -3,6 +3,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import sys
+from collections.abc import Mapping
 from dataclasses import dataclass
 from pathlib import Path
 
@@ -16,6 +17,7 @@ MAX_DEED_BYTES = 64 * 1024
 SUPPORTED_VERSION = 1
 SUPPORTED_ALG = -7
 KNOWN_TOP_LEVEL_FIELDS = set(range(1, 12))
+ARRAY_TYPES = (list, tuple)
 
 
 class VerificationError(Exception):
@@ -55,7 +57,7 @@ def _check_bstr(value: object, name: str, size: int) -> bytes:
 
 
 def _validate_rights(rights: object) -> dict:
-    _expect(isinstance(rights, dict), "rights must be a map")
+    _expect(isinstance(rights, Mapping), "rights must be a map")
 
     for label in range(1, 7):
         _expect(label in rights, f"rights field {label} is required")
@@ -76,20 +78,20 @@ def _validate_rights(rights: object) -> dict:
 
     if 7 in rights:
         platforms = rights[7]
-        _expect(isinstance(platforms, list) and 1 <= len(platforms) <= 32, "invalid platforms list")
+        _expect(isinstance(platforms, ARRAY_TYPES) and 1 <= len(platforms) <= 32, "invalid platforms list")
         for platform in platforms:
             _check_text(platform, "platform", 32)
 
     if 9 in rights:
         dependencies = rights[9]
         _expect(
-            isinstance(dependencies, list) and 1 <= len(dependencies) <= 32,
+            isinstance(dependencies, ARRAY_TYPES) and 1 <= len(dependencies) <= 32,
             "invalid service dependency list",
         )
         for dependency in dependencies:
             _check_text(dependency, "service dependency", 128)
 
-    return rights
+    return dict(rights)
 
 
 def _public_key_id(public_key: ec.EllipticCurvePublicKey) -> bytes:
@@ -107,12 +109,12 @@ def verify_deed(raw: bytes, public_key_pem: bytes, expected_asset: str | None = 
         raise VerificationError("invalid CBOR") from exc
 
     _expect(isinstance(cose, cbor2.CBORTag) and cose.tag == 18, "expected tagged COSE_Sign1")
-    _expect(isinstance(cose.value, (list, tuple)) and len(cose.value) == 4, "invalid COSE_Sign1 structure")
+    _expect(isinstance(cose.value, ARRAY_TYPES) and len(cose.value) == 4, "invalid COSE_Sign1 structure")
 
     protected_bytes, unprotected, payload_bytes, signature = cose.value
 
     _expect(isinstance(protected_bytes, bytes), "protected header must be bytes")
-    _expect(isinstance(unprotected, dict) and not unprotected, "unprotected headers are not allowed in this draft")
+    _expect(isinstance(unprotected, Mapping) and not unprotected, "unprotected headers are not allowed in this draft")
     _expect(isinstance(payload_bytes, bytes), "embedded payload is required")
     _expect(isinstance(signature, bytes) and len(signature) == 64, "ES256 signature must be 64 bytes")
 
@@ -121,7 +123,7 @@ def verify_deed(raw: bytes, public_key_pem: bytes, expected_asset: str | None = 
     except Exception as exc:
         raise VerificationError("invalid protected header") from exc
 
-    _expect(isinstance(protected, dict), "protected header must decode to a map")
+    _expect(isinstance(protected, Mapping), "protected header must decode to a map")
     _expect(protected.get(1) == SUPPORTED_ALG, "unsupported COSE algorithm")
     _expect(isinstance(protected.get(4), bytes), "protected kid is required")
     _expect(set(protected.keys()) <= {1, 4}, "unsupported protected header")
@@ -150,14 +152,15 @@ def verify_deed(raw: bytes, public_key_pem: bytes, expected_asset: str | None = 
     except Exception as exc:
         raise VerificationError("invalid deed payload") from exc
 
-    _expect(isinstance(deed, dict), "deed payload must be a map")
-    _expect(cbor2.dumps(deed, canonical=True) == payload_bytes, "deed payload is not deterministic CBOR")
+    _expect(isinstance(deed, Mapping), "deed payload must be a map")
+    normalized_deed = dict(deed)
+    _expect(cbor2.dumps(normalized_deed, canonical=True) == payload_bytes, "deed payload is not deterministic CBOR")
 
     required = set(range(1, 9))
     _expect(required <= set(deed.keys()), "deed is missing a required field")
 
     critical = deed.get(11, [])
-    _expect(isinstance(critical, list) and len(critical) <= 32, "invalid critical field list")
+    _expect(isinstance(critical, ARRAY_TYPES) and len(critical) <= 32, "invalid critical field list")
     for label in critical:
         _expect(_is_uint(label), "critical field labels must be unsigned integers")
         _expect(label in KNOWN_TOP_LEVEL_FIELDS, f"unknown critical field {label}")
