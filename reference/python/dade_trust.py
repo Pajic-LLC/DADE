@@ -3,9 +3,15 @@ from __future__ import annotations
 from collections.abc import Mapping
 from dataclasses import dataclass
 
-from dade_identity import load_p256_public_key, owner_id, verify_signed_map
-from dade_issuer import issuer_id
-from dade_verify import VerificationError
+from dade_identity import (
+    IdentityChainResult,
+    load_p256_public_key,
+    owner_id,
+    verify_identity_chain,
+    verify_signed_map,
+)
+from dade_issuer import IssuerTrustResult, issuer_id, verify_deed_with_issuer_trust
+from dade_verify import VerificationError, VerificationResult
 
 ARRAY_TYPES = (list, tuple)
 
@@ -150,3 +156,57 @@ def require_signing_key_trusted(
         return
 
     _expect(deed_issued_at < reject_from, "deed was issued after signing key compromise cutoff")
+
+
+def verify_deed_with_trust_state(
+    deed_raw: bytes,
+    root_public_key_pem: bytes,
+    signing_credential_raw: bytes,
+    issuer_trust_state: IssuerTrustState | None = None,
+    expected_asset: str | None = None,
+) -> IssuerTrustResult:
+    result = verify_deed_with_issuer_trust(
+        deed_raw,
+        root_public_key_pem,
+        signing_credential_raw,
+        expected_asset=expected_asset,
+    )
+
+    if issuer_trust_state is not None:
+        _expect(issuer_trust_state.issuer_id == result.issuer_id, "issuer trust state belongs to the wrong issuer")
+        require_signing_key_trusted(
+            result.signing_key_id,
+            result.deed.issued_at,
+            issuer_trust_state,
+        )
+
+    return result
+
+
+def verify_identity_chain_with_trust_state(
+    deed: VerificationResult,
+    anchor_public_key_pem: bytes,
+    controller_credential: bytes,
+    device_authorization: bytes,
+    device_proof: bytes,
+    challenge: bytes,
+    expected_asset: str,
+    owner_trust_state: OwnerTrustState | None = None,
+    requested_right: int = 1,
+) -> IdentityChainResult:
+    result = verify_identity_chain(
+        deed,
+        anchor_public_key_pem,
+        controller_credential,
+        device_authorization,
+        device_proof,
+        challenge,
+        expected_asset,
+        requested_right=requested_right,
+    )
+
+    if owner_trust_state is not None:
+        _expect(owner_trust_state.owner_id == result.owner_id, "owner trust state belongs to the wrong owner")
+        require_controller_trusted(result.controller_id, owner_trust_state)
+
+    return result
