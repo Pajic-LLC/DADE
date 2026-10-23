@@ -10,8 +10,11 @@ The specification is intentionally small right now. We are still deciding parts 
 - [Digital deed model](deed-model.md)
 - [Rights model](rights.md)
 - [Local verifier contract](verifier-contract.md)
+- [Encoding and signature profile](encoding-profile.md)
 
-These files define the logical model. They do not freeze a wire format or cryptographic suite yet.
+The logical model is now defined well enough to start wire-format work.
+
+The encoding profile proposes deterministic CBOR, COSE_Sign1, and ES256 for the first implementation. It is still a draft until test vectors and implementation work prove the choice.
 
 ## Planned sections
 
@@ -48,10 +51,8 @@ DADE should separate the protocol from Pajic's hosted services so an existing de
 
 No protocol version has been frozen.
 
-No file format has been frozen.
-
 No exported deed file extension has been frozen. If DADE uses one, it will use a three-character extension.
 
-No cryptographic algorithm suite has been frozen.
+The first encoding and signature profile is proposed, not final.
 
 No production implementation should claim DADE 1 conformance yet.
