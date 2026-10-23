@@ -26,15 +26,17 @@ Lend allowed
 SHA-256 of the binary COSE object:
 
 ```text
-83baf3b43ec5828fbe3f1026b9723ea97e02f27c867e477e1bf46745c18bbdec
+a1549efd0c124eb872d1949c74931bdb3b1cb39b76ff29d843989a9af31477e9
 ```
 
 The protected COSE header decodes to:
 
 ```text
 alg: -7
-kid: 3356f52ab50e2120
+kid: 65c3c676b246f30c
 ```
+
+The key ID is the first eight bytes of SHA-256 over the canonical public COSE_Key.
 
 The issuer public key is in `issuer-public-key.pem`.
 
@@ -63,8 +65,14 @@ Signature invalid
 SHA-256 of the tampered binary object:
 
 ```text
-edadca06f840aa3d8414dea4a47259dedf8721c25ea8e5460b0eeed00eb0f257
+a49e1cb4436a7f785499b68fb1c86fb3878aab302a4615daf317d5b0e6ae209c
 ```
+
+## Identity chain
+
+The `identity` directory contains a complete owner, controller, device authorization, and device proof chain.
+
+See [identity/README.md](identity/README.md) for the expected identifiers and verification steps.
 
 ## Reading the hex files
 
