@@ -21,6 +21,8 @@ The specification is intentionally small right now. We are still deciding parts 
 - [Issuer signing credential](issuer-credential.md)
 - [Recovery](recovery.md)
 - [Recovery bundle schema](recovery.cddl)
+- [Trust updates](trust-updates.md)
+- [Trust update schema](trust-updates.cddl)
 
 The logical deed model and first signed wire format now have a working reference verifier.
 
@@ -30,9 +32,11 @@ The issuer trust drafts separate a stable issuer root from routine deed signing 
 
 The recovery draft restores the same owner anchor from an encrypted portable backup. A successful recovery keeps the same owner ID and does not require deeds to be reissued.
 
+The trust update draft adds signed owner and issuer trust snapshots. These let a verifier remember controller revocations and signing-key compromise cutoffs without requiring a live DADE service during normal use.
+
 The first technical profile uses deterministic CBOR, COSE_Sign1, and ES256. The wire-format draft proposes `.ddc` as the three-character portable deed extension. The recovery draft proposes `.drb` for an exported recovery bundle.
 
-The reference work includes a complete offline test chain from issuer root to signing key to deed, then from deed to owner anchor to controller to personal device to a fresh launch proof. Recovery adds a separate path for restoring the same owner anchor when every normal controller is unavailable.
+The reference work includes a complete offline test chain from issuer root to signing key to deed, then from deed to owner anchor to controller to personal device to a fresh launch proof. Recovery adds a separate path for restoring the same owner anchor when every normal controller is unavailable. Trust snapshots add portable signed updates for later compromise information.
 
 These choices are still draft until broader implementation and security review prove them.
 
@@ -71,6 +75,6 @@ DADE should separate the protocol from Pajic's hosted services so an existing de
 
 No protocol version has been frozen.
 
-The first encoding, signature, wire-format, identity, device, issuer-trust, and recovery models are proposed, not final.
+The first encoding, signature, wire-format, identity, device, issuer-trust, recovery, and trust-update models are proposed, not final.
 
 No production implementation should claim DADE 1 conformance yet.

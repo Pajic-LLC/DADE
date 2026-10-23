@@ -86,7 +86,21 @@ The tests also prove that the recovered anchor can issue a fresh controller cred
 
 A wrong recovery secret or a tampered recovery bundle must fail authentication.
 
-Recovery does not claim that an old controller can be remotely erased while it is offline. Controller revocation is separate work.
+Recovery does not claim that an old controller can be remotely erased while it is offline.
+
+## Trust updates
+
+`dade_trust.py` verifies signed trust snapshots after recovery or a later compromise event.
+
+Owner trust snapshots are signed by the owner anchor. They carry a sequence number and a list of revoked controller IDs.
+
+Issuer trust snapshots are signed by the issuer root. They carry a sequence number and signing-key compromise cutoffs.
+
+The verifier can reject an older snapshot once it securely remembers a newer sequence number.
+
+A compromise cutoff preserves deeds issued before the cutoff and rejects deeds issued by that key at or after the cutoff.
+
+The verifier still does not pretend that a permanently offline machine can know about a snapshot it has never received.
 
 ## Tests
 
@@ -111,6 +125,11 @@ The tests cover:
 - wrong recovery secrets
 - tampered recovery bundles
 - tampered recovery owner IDs
+- controller revocation snapshots
+- owner trust rollback rejection
+- issuer compromise cutoffs
+- issuer trust rollback rejection
+- wrong trust-snapshot signing authorities
 
 ## Scope
 
@@ -143,12 +162,15 @@ The reference verifier currently checks:
 - encrypted owner-anchor recovery bundles
 - recovery owner-ID continuity
 - recovery bundle authentication
+- owner trust snapshot signatures
+- issuer trust snapshot signatures
+- trust snapshot sequence rollback checks
+- controller revocation state
+- signing-key compromise cutoffs
 
 It does not yet check:
 
-- issuer revocation updates
 - issuer root migration
-- controller revocation distribution
 - transfer state
 - lending state
 - inheritance
