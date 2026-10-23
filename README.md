@@ -61,6 +61,8 @@ DADE 2 is not the current project. DADE 1 comes first.
 
 ## Project docs
 
+- [Ownership model](docs/ownership-model.md)
+- [User flows](docs/user-flows.md)
 - [Principles](docs/principles.md)
 - [Terminology](docs/terminology.md)
 - [Security model](docs/security.md)
