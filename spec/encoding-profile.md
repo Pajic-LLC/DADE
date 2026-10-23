@@ -20,34 +20,32 @@ DADE should not invent its own cryptography or binary serialization format.
 
 ## Deed payload: deterministic CBOR
 
-The first DADE 1 deed payload should use CBOR as defined by RFC 8949.
+The first DADE 1 deed payload uses CBOR as defined by RFC 8949.
 
-DADE should require deterministic encoding for signed payloads.
+Signed payloads use deterministic encoding.
 
 For the first profile:
 
 - use preferred serialization
 - use definite-length arrays and maps
 - reject duplicate map keys
-- sort map keys according to the deterministic encoding rules
+- sort map keys according to deterministic encoding rules
 - do not use floating-point values in the core deed format
 - reject values outside the limits defined by the DADE schema
 
-Using deterministic CBOR gives the same logical deed one predictable signed byte representation.
+Using deterministic CBOR gives the same logical object one predictable signed byte representation.
 
 ## Signature wrapper: COSE_Sign1
 
-A deed issued by one issuer should use COSE_Sign1 as defined by RFC 9052.
+A DADE object signed by one key uses COSE_Sign1 as defined by RFC 9052.
 
-The COSE payload contains the deterministic CBOR deed.
+The protected header contains the signature algorithm and key identifier.
 
-The protected header should carry the signature algorithm and key identifier.
-
-The initial profile should use the tagged COSE_Sign1 form so the object identifies itself as signed COSE data.
+The initial profile uses the tagged COSE_Sign1 form so the object identifies itself as signed COSE data.
 
 ## First signature algorithm: ES256
 
-The first DADE 1 signature profile should use ECDSA with the NIST P-256 curve and SHA-256, commonly identified as ES256 in COSE.
+The first DADE 1 signature profile uses ECDSA with the NIST P-256 curve and SHA-256, commonly identified as ES256 in COSE.
 
 The reason is practical compatibility.
 
@@ -55,7 +53,36 @@ P-256 is widely implemented, works with common HSMs, is available through Apple 
 
 This does not mean DADE is permanently tied to one algorithm.
 
-The protocol must support algorithm agility so a later DADE version or profile can add another signature algorithm without redefining the deed model.
+The protocol must support algorithm agility so a later DADE version or profile can add another signature algorithm without redefining the ownership model.
+
+## Public key representation
+
+DADE 1 represents a P-256 public key as a public COSE_Key map:
+
+```text
+1   kty = 2, EC2
+-1  crv = 1, P-256
+-2  x coordinate, 32 bytes
+-3  y coordinate, 32 bytes
+```
+
+Private key material must not appear in a public credential.
+
+## Key identifiers
+
+Every DADE 1 COSE signature uses the same `kid` construction for P-256 keys:
+
+```text
+kid = first 8 bytes of SHA-256(canonical public COSE_Key)
+```
+
+The key identifier is a lookup hint. It is not an issuer ID, owner ID, controller ID, or device ID.
+
+Using one construction everywhere avoids format-specific key fingerprints.
+
+An issuer can rotate signing keys while keeping the same issuer identity.
+
+The issuer trust and rotation model will be defined separately.
 
 ## What is signed
 
@@ -74,23 +101,15 @@ That includes at least:
 
 Unsigned metadata must never be allowed to override or weaken signed ownership data.
 
-## Key identifiers
+The same rule applies to controller credentials, device authorizations, and device proofs.
 
-The COSE protected header should carry a key identifier that lets a verifier select the correct trusted issuer public key.
+## Owner proof is separate from issuer proof
 
-The key identifier is not the issuer identity by itself.
-
-An issuer can rotate signing keys while keeping the same issuer identity.
-
-The trust and rotation model will be defined separately.
-
-## Owner proof is separate
-
-The issuer signature proves that the deed is genuine.
+The issuer signature proves that a deed is genuine.
 
 It does not by itself prove that the person presenting the deed controls the owner identity named in it.
 
-Owner proof is a separate part of DADE and will be defined with the identity and device model.
+The identity and device specifications define that second proof chain.
 
 Keeping these jobs separate makes the verifier easier to reason about:
 
@@ -98,8 +117,8 @@ Keeping these jobs separate makes the verifier easier to reason about:
 Issuer signature
 = Is this a real deed?
 
-Owner proof
-= Does this person control the owner identity?
+Owner and device chain
+= Is this an authorized use by the deed owner?
 ```
 
 ## Parsing rules
@@ -108,7 +127,7 @@ A DADE parser should reject:
 
 - malformed CBOR
 - duplicate map keys
-- indefinite-length values in the signed deed payload
+- indefinite-length values in signed protocol payloads
 - unsupported protocol versions
 - unsupported signature algorithms
 - missing required fields
@@ -130,19 +149,15 @@ The wire format should distinguish between:
 
 If an unknown field is marked critical, verification must fail instead of guessing.
 
-The exact extension mechanism will be defined with the field registry.
-
 ## Exported deed files
 
-DADE may define a portable exported deed file for backup, import, or inspection.
+The wire-format draft proposes `.ddc` for portable Digital Deed Certificate files.
 
-The file extension is not frozen yet.
-
-If a custom extension is used, it will be exactly three characters.
-
-The file should contain the signed COSE object rather than an unsigned JSON representation.
+The file contains the signed COSE object rather than an unsigned JSON representation.
 
 Human-readable tools can decode the file for inspection.
+
+The extension remains draft until the first format release.
 
 ## Why not JSON as the signed format
 
@@ -164,13 +179,11 @@ If the standards we depend on stop being suitable, DADE should move to another r
 Payload          Deterministic CBOR
 Signature object COSE_Sign1
 Signature        ECDSA P-256 with SHA-256
+Public key       COSE_Key EC2 P-256
+Key ID           SHA-256 over canonical public COSE_Key, first 8 bytes
 Hash             SHA-256 where a standalone digest is needed
-Network required No, not for local deed signature verification
+Network required No, not for local signature and identity-chain verification
 ```
-
-This profile covers deed encoding and issuer signatures only.
-
-It does not yet define owner identity, device authorization, transfer, lending, recovery, or the final issuer trust store.
 
 ## References
 
