@@ -35,21 +35,21 @@ DADE is not meant to make every digital file impossible to copy. Files are copya
 
 DADE 1 is the version we can build now.
 
-The first implementation is expected to focus on software and games, with a future Pajic title as the first real production use case.
+The first implementation focuses on software and games, with VICE as the first application integration.
 
-The early work will cover:
+The current DADE 1 work includes:
 
-- digital deeds
-- ownership verification
-- offline ownership
-- use across a person's own devices
-- gifting and transfer
-- lending
-- recovery
-- issuer trust
-- security and abuse resistance
+- signed digital deeds
+- local ownership verification
+- permanent offline-capable ownership
+- owner, controller, and personal device credentials
+- issuer trust and signing-key rotation
+- encrypted ownership recovery
+- signed trust updates and rollback checks
+- a small application verification API
+- a native VICE provider for macOS ARM64 and Windows x64
 
-Some of those parts are still design work. We are not going to pretend they are solved before they are.
+Transfer, gifting, lending, retail key storage, and final conformance rules are not finished yet.
 
 ## DADE 2
 
@@ -86,9 +86,11 @@ See [LEGAL.md](LEGAL.md) before using any material from this repository.
 
 ## Status
 
-Early design work.
+DADE 1 is a working draft with reference and native implementations. It is not a frozen standard and no production implementation should claim DADE 1 conformance yet.
 
-The current job is to define the ownership model, security rules, terminology, threat model, and a small first implementation without locking ourselves into bad decisions too early.
+The current engineering target is a retail-style VICE vertical slice. That work covers protected package metadata, hardware-backed device signing where available, real test issuance, offline reinstall, second-device use, revocation, and rollback tests.
+
+See [Stage J](https://github.com/Pajic-LLC/DADE/issues/24) for the active hardening work.
 
 ## One rule we care about
 
