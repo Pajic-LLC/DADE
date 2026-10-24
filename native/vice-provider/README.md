@@ -86,7 +86,11 @@ Device proof creation goes through a small signer interface. The provider asks t
 
 If there is no signer descriptor, the provider keeps the existing development behavior and reads a PKCS#8 P-256 key from `devices/<device-id>.pem`.
 
-A signer descriptor selects a different backend. The first hardware-backed descriptor is:
+Hardware-backed signer descriptors select a platform backend. Unknown signer backends and malformed signer descriptors fail closed.
+
+### macOS Secure Enclave
+
+The macOS descriptor is:
 
 ```text
 macos-secure-enclave-v1 <application-label-hex>
@@ -96,9 +100,7 @@ The application label identifies an existing private key in the protected macOS 
 
 The Security.framework signature is converted from DER into the raw 64-byte `r || s` form used by the existing DADE COSE_Sign1 profile. This does not change the VICE ABI or DADE wire format.
 
-Unknown signer backends and malformed signer descriptors fail closed.
-
-### Secure Enclave enrollment
+#### Secure Enclave enrollment
 
 The runtime provider does not create a new Secure Enclave key if the expected key is missing. Creating a replacement key during game launch would produce a different DADE device identity and would weaken the device-authorization model.
 
@@ -128,9 +130,21 @@ Activation reloads the exact Secure Enclave key, derives its DADE device ID agai
 
 The private key never appears in the command output or DADE store.
 
-### Windows
+### Windows TPM
 
-The Windows retail backend remains separate work. It will use the same signer interface with TPM-backed CNG keys and the Microsoft Platform Crypto Provider.
+The Windows descriptor is:
+
+```text
+windows-tpm-v1 <utf8-key-name-hex>
+```
+
+The decoded key name identifies an existing persisted key in the Microsoft Platform Crypto Provider. The descriptor does not contain private key material.
+
+The provider opens that exact CNG key, exports only its `BCRYPT_ECCPUBLIC_BLOB`, requires an ECDSA P-256 public key, reconstructs the public SEC1 point, and checks the resulting DADE device ID against the normal device authorization.
+
+For each launch proof, DADE hashes the existing COSE `Sig_structure` with SHA-256 and asks CNG to sign that pre-hash with `NCryptSignHash`. The provider requires the P-256 signature to be the expected 64-byte `r || s` form before placing it into the existing COSE_Sign1 proof.
+
+The runtime path never creates a replacement TPM key. Windows TPM enrollment and post-authorization activation are separate from game launch, matching the Secure Enclave model.
 
 ## Cross-language tests
 

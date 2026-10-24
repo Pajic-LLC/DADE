@@ -16,6 +16,7 @@ const SUPPORTED_ALG: i64 = -7;
 const MAX_SIGNER_DESCRIPTOR_BYTES: u64 = 1024;
 const FILE_BACKEND: &str = "file-pkcs8-v1";
 const MACOS_SECURE_ENCLAVE_BACKEND: &str = "macos-secure-enclave-v1";
+const WINDOWS_TPM_BACKEND: &str = "windows-tpm-v1";
 
 pub trait DeviceSigner {
     fn public_key(&self) -> PublicKey;
@@ -45,6 +46,7 @@ impl DeviceSigner for FileDeviceSigner {
 enum SignerLocator {
     FilePkcs8,
     MacosSecureEnclave { application_label: Vec<u8> },
+    WindowsTpm { key_name: String },
 }
 
 fn read_signer_locator(home: &Path, device_id: &[u8; 16]) -> Result<SignerLocator, String> {
@@ -82,7 +84,17 @@ fn read_signer_locator(home: &Path, device_id: &[u8; 16]) -> Result<SignerLocato
             }
             Ok(SignerLocator::MacosSecureEnclave { application_label })
         }
-        FILE_BACKEND | MACOS_SECURE_ENCLAVE_BACKEND => {
+        WINDOWS_TPM_BACKEND if fields.len() == 2 => {
+            let raw_name = hex::decode(fields[1])
+                .map_err(|_| "Windows TPM key name is not valid hex".to_string())?;
+            let key_name = String::from_utf8(raw_name)
+                .map_err(|_| "Windows TPM key name is not valid UTF-8".to_string())?;
+            if key_name.is_empty() || key_name.len() > 128 || key_name.contains('\0') {
+                return Err("Windows TPM key name has an invalid length or value".to_string());
+            }
+            Ok(SignerLocator::WindowsTpm { key_name })
+        }
+        FILE_BACKEND | MACOS_SECURE_ENCLAVE_BACKEND | WINDOWS_TPM_BACKEND => {
             Err("device signer descriptor has the wrong number of fields".to_string())
         }
         _ => Err(format!("unsupported device signer backend `{backend}`")),
@@ -265,6 +277,210 @@ mod macos {
     }
 }
 
+#[cfg(target_os = "windows")]
+mod windows_tpm {
+    use std::ptr::{null, null_mut};
+
+    use p256::ecdsa::Signature;
+    use p256::PublicKey;
+    use sha2::{Digest, Sha256};
+    use windows_sys::Win32::Security::Cryptography::{
+        BCRYPT_ECCPUBLIC_BLOB, BCRYPT_ECDSA_PUBLIC_P256_MAGIC, MS_PLATFORM_CRYPTO_PROVIDER,
+        NCryptExportKey, NCryptFreeObject, NCryptOpenKey, NCryptOpenStorageProvider,
+        NCryptSignHash, NCRYPT_KEY_HANDLE, NCRYPT_PROV_HANDLE,
+    };
+
+    use super::DeviceSigner;
+
+    fn cng_error(operation: &str, status: i32) -> String {
+        format!("{operation} failed with CNG status 0x{:08x}", status as u32)
+    }
+
+    fn wide(value: &str) -> Vec<u16> {
+        value.encode_utf16().chain(std::iter::once(0)).collect()
+    }
+
+    struct ProviderHandle(NCRYPT_PROV_HANDLE);
+
+    impl Drop for ProviderHandle {
+        fn drop(&mut self) {
+            if self.0 != 0 {
+                unsafe {
+                    NCryptFreeObject(self.0);
+                }
+            }
+        }
+    }
+
+    struct KeyHandle(NCRYPT_KEY_HANDLE);
+
+    impl Drop for KeyHandle {
+        fn drop(&mut self) {
+            if self.0 != 0 {
+                unsafe {
+                    NCryptFreeObject(self.0);
+                }
+            }
+        }
+    }
+
+    pub struct WindowsTpmDeviceSigner {
+        _provider: ProviderHandle,
+        key: KeyHandle,
+        public_key: PublicKey,
+    }
+
+    impl DeviceSigner for WindowsTpmDeviceSigner {
+        fn public_key(&self) -> PublicKey {
+            self.public_key.clone()
+        }
+
+        fn sign(&self, message: &[u8]) -> Result<[u8; 64], String> {
+            let digest = Sha256::digest(message);
+            let mut required = 0_u32;
+            let status = unsafe {
+                NCryptSignHash(
+                    self.key.0,
+                    null(),
+                    digest.as_ptr(),
+                    digest.len() as u32,
+                    null_mut(),
+                    0,
+                    &mut required,
+                    0,
+                )
+            };
+            if status < 0 {
+                return Err(cng_error("TPM signature sizing", status));
+            }
+            if required != 64 {
+                return Err(format!(
+                    "TPM returned an unexpected P-256 signature size of {required} bytes"
+                ));
+            }
+
+            let mut raw = [0_u8; 64];
+            let mut written = 0_u32;
+            let status = unsafe {
+                NCryptSignHash(
+                    self.key.0,
+                    null(),
+                    digest.as_ptr(),
+                    digest.len() as u32,
+                    raw.as_mut_ptr(),
+                    raw.len() as u32,
+                    &mut written,
+                    0,
+                )
+            };
+            if status < 0 {
+                return Err(cng_error("TPM signing", status));
+            }
+            if written != raw.len() as u32 {
+                return Err(format!(
+                    "TPM returned an incomplete P-256 signature of {written} bytes"
+                ));
+            }
+
+            let signature = Signature::from_slice(&raw)
+                .map_err(|_| "TPM returned an invalid raw P-256 signature".to_string())?;
+            let signature = signature.normalize_s().unwrap_or(signature);
+            let bytes = signature.to_bytes();
+            let mut output = [0_u8; 64];
+            output.copy_from_slice(&bytes);
+            Ok(output)
+        }
+    }
+
+    fn export_public_key(key: NCRYPT_KEY_HANDLE) -> Result<PublicKey, String> {
+        let mut required = 0_u32;
+        let status = unsafe {
+            NCryptExportKey(
+                key,
+                0,
+                BCRYPT_ECCPUBLIC_BLOB,
+                null(),
+                null_mut(),
+                0,
+                &mut required,
+                0,
+            )
+        };
+        if status < 0 {
+            return Err(cng_error("TPM public-key sizing", status));
+        }
+        if required < 72 || required > 4096 {
+            return Err(format!(
+                "TPM returned an unexpected public-key blob size of {required} bytes"
+            ));
+        }
+
+        let mut blob = vec![0_u8; required as usize];
+        let mut written = 0_u32;
+        let status = unsafe {
+            NCryptExportKey(
+                key,
+                0,
+                BCRYPT_ECCPUBLIC_BLOB,
+                null(),
+                blob.as_mut_ptr(),
+                blob.len() as u32,
+                &mut written,
+                0,
+            )
+        };
+        if status < 0 {
+            return Err(cng_error("TPM public-key export", status));
+        }
+        blob.truncate(written as usize);
+        if blob.len() < 8 {
+            return Err("TPM returned a truncated ECC public-key blob".to_string());
+        }
+
+        let magic = u32::from_le_bytes(blob[0..4].try_into().unwrap());
+        let coordinate_bytes = u32::from_le_bytes(blob[4..8].try_into().unwrap()) as usize;
+        if magic != BCRYPT_ECDSA_PUBLIC_P256_MAGIC || coordinate_bytes != 32 {
+            return Err("TPM key is not an ECDSA P-256 key".to_string());
+        }
+        if blob.len() != 8 + coordinate_bytes * 2 {
+            return Err("TPM returned a malformed ECC public-key blob".to_string());
+        }
+
+        let mut sec1 = [0_u8; 65];
+        sec1[0] = 4;
+        sec1[1..33].copy_from_slice(&blob[8..40]);
+        sec1[33..65].copy_from_slice(&blob[40..72]);
+        PublicKey::from_sec1_bytes(&sec1)
+            .map_err(|_| "TPM returned an invalid P-256 public key".to_string())
+    }
+
+    pub fn load(key_name: &str) -> Result<Box<dyn DeviceSigner>, String> {
+        let mut provider = 0;
+        let status = unsafe {
+            NCryptOpenStorageProvider(&mut provider, MS_PLATFORM_CRYPTO_PROVIDER, 0)
+        };
+        if status < 0 {
+            return Err(cng_error("opening Microsoft Platform Crypto Provider", status));
+        }
+        let provider = ProviderHandle(provider);
+
+        let name = wide(key_name);
+        let mut key = 0;
+        let status = unsafe { NCryptOpenKey(provider.0, &mut key, name.as_ptr(), 0, 0) };
+        if status < 0 {
+            return Err(cng_error("opening TPM device key", status));
+        }
+        let key = KeyHandle(key);
+        let public_key = export_public_key(key.0)?;
+
+        Ok(Box::new(WindowsTpmDeviceSigner {
+            _provider: provider,
+            key,
+            public_key,
+        }))
+    }
+}
+
 #[cfg(target_os = "macos")]
 pub fn enroll_macos_secure_enclave() -> Result<MacosSecureEnclaveEnrollment, String> {
     macos::enroll()
@@ -300,6 +516,17 @@ pub fn load_device_signer(
             {
                 let _ = application_label;
                 Err("macOS Secure Enclave signer is unavailable on this platform".to_string())
+            }
+        }
+        SignerLocator::WindowsTpm { key_name } => {
+            #[cfg(target_os = "windows")]
+            {
+                return windows_tpm::load(&key_name);
+            }
+            #[cfg(not(target_os = "windows"))]
+            {
+                let _ = key_name;
+                Err("Windows TPM signer is unavailable on this platform".to_string())
             }
         }
     }
@@ -389,7 +616,21 @@ mod tests {
             SignerLocator::MacosSecureEnclave { application_label } => {
                 assert_eq!(application_label, hex::decode("001122aabbcc").unwrap());
             }
-            SignerLocator::FilePkcs8 => panic!("wrong signer backend"),
+            _ => panic!("wrong signer backend"),
+        }
+        std::fs::remove_dir_all(home).ok();
+    }
+
+    #[test]
+    fn windows_tpm_descriptor_parses_key_name() {
+        let home = temporary_home("windows-tpm");
+        let device_id = [9_u8; 16];
+        let path = store::device_signer_path(&home, &device_id);
+        let name = "DADE-device-001122";
+        std::fs::write(path, format!("{WINDOWS_TPM_BACKEND} {}\n", hex::encode(name))).unwrap();
+        match read_signer_locator(&home, &device_id).unwrap() {
+            SignerLocator::WindowsTpm { key_name } => assert_eq!(key_name, name),
+            _ => panic!("wrong signer backend"),
         }
         std::fs::remove_dir_all(home).ok();
     }
@@ -397,7 +638,7 @@ mod tests {
     #[test]
     fn unknown_signer_backend_fails_closed() {
         let home = temporary_home("unknown");
-        let device_id = [9_u8; 16];
+        let device_id = [10_u8; 16];
         let path = store::device_signer_path(&home, &device_id);
         std::fs::write(path, "mystery-signer-v1\n").unwrap();
         let error = read_signer_locator(&home, &device_id).unwrap_err();
@@ -408,7 +649,7 @@ mod tests {
     #[test]
     fn signer_descriptor_is_create_only() {
         let home = temporary_home("create-only");
-        let device_id = [10_u8; 16];
+        let device_id = [11_u8; 16];
         write_macos_secure_enclave_locator(&home, &device_id, &[1, 2, 3]).unwrap();
         let error = write_macos_secure_enclave_locator(&home, &device_id, &[4, 5, 6]).unwrap_err();
         assert!(error.contains("could not create device signer descriptor"));
