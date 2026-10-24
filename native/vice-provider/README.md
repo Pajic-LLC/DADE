@@ -102,7 +102,31 @@ Unknown signer backends and malformed signer descriptors fail closed.
 
 The runtime provider does not create a new Secure Enclave key if the expected key is missing. Creating a replacement key during game launch would produce a different DADE device identity and would weaken the device-authorization model.
 
-Secure Enclave key creation therefore belongs to a separate enrollment flow. That flow must create a non-exportable P-256 key, expose its public key for controller authorization, and install the signer descriptor only after the resulting device has been authorized.
+On macOS, build the provider crate and run:
+
+```sh
+cargo run --manifest-path native/vice-provider/Cargo.toml --bin dade-device -- enroll-macos
+```
+
+The command creates a non-exportable P-256 key in Secure Enclave with device-only, unlocked access and private-key signing permission. It prints:
+
+- the DADE device ID
+- the keychain application label used to find the key again
+- the public P-256 key in uncompressed SEC1 form
+- the signer descriptor that will eventually be installed
+
+It does **not** install the signer descriptor yet. Use the public key to issue the normal DADE device authorization first.
+
+After that authorization is installed, activate the hardware signer:
+
+```sh
+cargo run --manifest-path native/vice-provider/Cargo.toml --bin dade-device -- \
+  activate-macos <device-id-hex> <application-label-hex>
+```
+
+Activation reloads the exact Secure Enclave key, derives its DADE device ID again, and refuses to install the descriptor if the IDs do not match. The descriptor is create-only so an existing signer selection is not silently replaced.
+
+The private key never appears in the command output or DADE store.
 
 ### Windows
 

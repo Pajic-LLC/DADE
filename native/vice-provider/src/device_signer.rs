@@ -1,4 +1,5 @@
 use std::fs;
+use std::io::Write;
 use std::path::Path;
 
 use ciborium::value::Value;
@@ -88,6 +89,36 @@ fn read_signer_locator(home: &Path, device_id: &[u8; 16]) -> Result<SignerLocato
     }
 }
 
+fn write_macos_secure_enclave_locator(
+    home: &Path,
+    device_id: &[u8; 16],
+    application_label: &[u8],
+) -> Result<(), String> {
+    if application_label.is_empty() || application_label.len() > 64 {
+        return Err("Secure Enclave application label has an invalid length".to_string());
+    }
+    let path = store::device_signer_path(home, device_id);
+    let parent = path
+        .parent()
+        .ok_or_else(|| "device signer descriptor has no parent directory".to_string())?;
+    fs::create_dir_all(parent)
+        .map_err(|error| format!("could not create device signer directory: {error}"))?;
+    let mut file = fs::OpenOptions::new()
+        .write(true)
+        .create_new(true)
+        .open(&path)
+        .map_err(|error| format!("could not create device signer descriptor: {error}"))?;
+    writeln!(
+        file,
+        "{MACOS_SECURE_ENCLAVE_BACKEND} {}",
+        hex::encode(application_label)
+    )
+    .map_err(|error| format!("could not write device signer descriptor: {error}"))?;
+    file.sync_all()
+        .map_err(|error| format!("could not sync device signer descriptor: {error}"))?;
+    Ok(())
+}
+
 fn load_file_signer(home: &Path, device_id: &[u8; 16]) -> Result<Box<dyn DeviceSigner>, String> {
     let path = store::device_key_path(home, device_id);
     let pem = store::read_pem(&path)
@@ -98,13 +129,28 @@ fn load_file_signer(home: &Path, device_id: &[u8; 16]) -> Result<Box<dyn DeviceS
 }
 
 #[cfg(target_os = "macos")]
+pub struct MacosSecureEnclaveEnrollment {
+    pub device_id: [u8; 16],
+    pub application_label: Vec<u8>,
+    pub public_key: PublicKey,
+}
+
+#[cfg(target_os = "macos")]
 mod macos {
     use p256::ecdsa::Signature;
     use p256::PublicKey;
-    use security_framework::item::{ItemSearchOptions, KeyClass, Reference, SearchResult};
-    use security_framework::key::{Algorithm, SecKey};
+    use security_framework::access_control::{ProtectionMode, SecAccessControl};
+    use security_framework::item::{
+        ItemSearchOptions, KeyClass, Location, Reference, SearchResult,
+    };
+    use security_framework::key::{
+        Algorithm, GenerateKeyOptions, KeyType, SecKey, Token,
+    };
+    use security_framework::passwords_options::AccessControlOptions;
 
-    use super::DeviceSigner;
+    use crate::protocol;
+
+    use super::{DeviceSigner, MacosSecureEnclaveEnrollment};
 
     pub struct SecureEnclaveDeviceSigner {
         private_key: SecKey,
@@ -170,6 +216,73 @@ mod macos {
             public_key,
         }))
     }
+
+    pub fn enroll() -> Result<MacosSecureEnclaveEnrollment, String> {
+        let access_control = SecAccessControl::create_with_protection(
+            Some(ProtectionMode::AccessibleWhenUnlockedThisDeviceOnly),
+            AccessControlOptions::PRIVATE_KEY_USAGE.bits(),
+        )
+        .map_err(|error| format!("could not create Secure Enclave access control: {error}"))?;
+
+        let mut options = GenerateKeyOptions::default();
+        options
+            .set_key_type(KeyType::ec())
+            .set_size_in_bits(256)
+            .set_label("DADE device")
+            .set_token(Token::SecureEnclave)
+            .set_location(Location::DataProtectionKeychain)
+            .set_access_control(access_control);
+
+        let private_key = SecKey::new(&options)
+            .map_err(|error| format!("could not create Secure Enclave device key: {error}"))?;
+        let application_label = match private_key.application_label() {
+            Some(value) if !value.is_empty() => value,
+            _ => {
+                let _ = private_key.delete();
+                return Err("Secure Enclave key has no application label".to_string());
+            }
+        };
+        let public_key = match public_key(&private_key) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = private_key.delete();
+                return Err(error);
+            }
+        };
+        let device_id = match protocol::device_id(&public_key) {
+            Ok(value) => value,
+            Err(error) => {
+                let _ = private_key.delete();
+                return Err(error.to_string());
+            }
+        };
+
+        Ok(MacosSecureEnclaveEnrollment {
+            device_id,
+            application_label,
+            public_key,
+        })
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn enroll_macos_secure_enclave() -> Result<MacosSecureEnclaveEnrollment, String> {
+    macos::enroll()
+}
+
+#[cfg(target_os = "macos")]
+pub fn install_macos_secure_enclave_locator(
+    home: &Path,
+    device_id: &[u8; 16],
+    application_label: &[u8],
+) -> Result<(), String> {
+    let signer = macos::load(application_label)?;
+    let actual_device_id = protocol::device_id(&signer.public_key())
+        .map_err(|error| error.to_string())?;
+    if actual_device_id != *device_id {
+        return Err("Secure Enclave key does not match the requested DADE device ID".to_string());
+    }
+    write_macos_secure_enclave_locator(home, device_id, application_label)
 }
 
 pub fn load_device_signer(
@@ -289,6 +402,16 @@ mod tests {
         std::fs::write(path, "mystery-signer-v1\n").unwrap();
         let error = read_signer_locator(&home, &device_id).unwrap_err();
         assert!(error.contains("unsupported device signer backend"));
+        std::fs::remove_dir_all(home).ok();
+    }
+
+    #[test]
+    fn signer_descriptor_is_create_only() {
+        let home = temporary_home("create-only");
+        let device_id = [10_u8; 16];
+        write_macos_secure_enclave_locator(&home, &device_id, &[1, 2, 3]).unwrap();
+        let error = write_macos_secure_enclave_locator(&home, &device_id, &[4, 5, 6]).unwrap_err();
+        assert!(error.contains("could not create device signer descriptor"));
         std::fs::remove_dir_all(home).ok();
     }
 }
