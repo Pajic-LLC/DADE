@@ -59,6 +59,10 @@ pub fn device_key_path(home: &Path, device_id: &[u8; 16]) -> PathBuf {
     home.join("devices").join(format!("{}.pem", hex::encode(device_id)))
 }
 
+pub fn device_signer_path(home: &Path, device_id: &[u8; 16]) -> PathBuf {
+    home.join("devices").join(format!("{}.signer", hex::encode(device_id)))
+}
+
 pub fn issuer_sequence_path(home: &Path, issuer_id: &[u8; 16]) -> PathBuf {
     home.join("state")
         .join("issuers")
