@@ -73,18 +73,25 @@ For a permanent local deed the provider does this without a network request:
 7. Apply the newest cached owner trust snapshot.
 8. Verify the controller credential.
 9. Verify the device authorization.
-10. Create a fresh 32-byte launch challenge.
-11. Sign the challenge with the local device key.
-12. Verify the fresh device proof against the authorized device key.
-13. Return `owned` only if every required check passes.
+10. Load a device signer behind the provider boundary.
+11. Create a fresh 32-byte launch challenge.
+12. Ask the device signer to sign the proof input.
+13. Verify the fresh device proof against the authorized device key.
+14. Return `owned` only if every required check passes.
 
-## Device key status
+## Device signer boundary
 
-This Stage I provider keeps the device private key behind the provider boundary, so VICE cannot access it.
+Device proof creation now goes through a small signer interface. The provider asks that interface for the device public key and for an ES256 signature. The ownership verification path does not need direct access to a private key object anymore.
 
-The current reference store still uses a PKCS#8 PEM file for that device key. That is good enough for conformance and product integration work, but it is not the final retail key-storage design.
+The first backend still reads a PKCS#8 P-256 key from `devices/<device-id>.pem`. That keeps existing fixtures and cross-language tests working while the hardware-backed backends are built.
 
-A production provider should replace the file-backed signer with platform-backed key storage such as Secure Enclave on Apple platforms and TPM-backed keys on supported Windows systems. The verifier and VICE ABI do not need to change when that signer backend changes.
+The next retail step is to add platform implementations behind the same interface:
+
+- Secure Enclave on supported Apple hardware
+- TPM-backed signing on supported Windows hardware
+- an explicit development fallback where secure hardware is unavailable
+
+Those backends must return the same P-256 public key and raw 64-byte ES256 signature shape. They do not require a VICE ABI change or a DADE wire-format change.
 
 ## Cross-language tests
 
@@ -106,8 +113,8 @@ The Rust tests read the Python-generated expectations and must return the same d
 
 The Python path remains the conformance oracle for DADE 1 while the native implementation is young.
 
-## Packaging limit
+## Packaging status
 
-VICE currently uses a loose `dade.asset` file to mark a protected project.
+VICE staged builds no longer use `dade.asset` as the runtime enforcement switch. VICE now stamps staged executables with package metadata that records the DADE requirement and asset ID, validates that metadata before game code loads, and fails closed if it is missing or changed.
 
-That is not enough for final retail enforcement. The DADE asset ID still needs to be bound into signed or integrity-protected game package metadata so deleting one file cannot turn ownership checks off.
+`dade.asset` remains authoring input for development builds. Retail builds still need normal platform code signing after the VICE package stamp is written so an attacker cannot simply rewrite the executable and its metadata together.

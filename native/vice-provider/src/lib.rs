@@ -1,3 +1,4 @@
+mod device_signer;
 mod protocol;
 mod store;
 
@@ -11,11 +12,10 @@ use std::time::{SystemTime, UNIX_EPOCH};
 use rand_core::{OsRng, RngCore};
 
 use protocol::{
-    controller_id, device_id, issuer_id, load_private_key, load_public_key, owner_id,
-    peek_deed_issuer, sign_device_proof, verify_controller_credential, verify_deed,
-    verify_device_authorization, verify_device_proof, verify_issuer_trust_snapshot,
-    verify_owner_trust_snapshot, verify_signing_credential, CONTROLLER_SCOPE_AUTHORIZE_DEVICES,
-    DEVICE_SCOPE_USE_OWNED_ASSETS,
+    controller_id, device_id, issuer_id, load_public_key, owner_id, peek_deed_issuer,
+    verify_controller_credential, verify_deed, verify_device_authorization, verify_device_proof,
+    verify_issuer_trust_snapshot, verify_owner_trust_snapshot, verify_signing_credential,
+    CONTROLLER_SCOPE_AUTHORIZE_DEVICES, DEVICE_SCOPE_USE_OWNED_ASSETS,
 };
 
 const ABI_VERSION: u32 = 1;
@@ -466,40 +466,33 @@ fn verify_at_home(home: &Path, asset_id: &str, platform: &str) -> Decision {
         );
     }
 
-    let device_key_pem = match read_required_pem(
-        &store::device_key_path(home, &device.device_id),
-        DecisionCode::DeviceProofFailed,
-        "device signing key",
-    ) {
+    let signer = match device_signer::load_device_signer(home, &device.device_id) {
         Ok(value) => value,
-        Err(decision) => return decision,
+        Err(error) => return Decision::deny(DecisionCode::DeviceProofFailed, error),
     };
-    let device_private_key = match load_private_key(&device_key_pem, "device signing key") {
-        Ok(value) => value,
-        Err(error) => return Decision::deny(DecisionCode::DeviceProofFailed, error.0),
-    };
-    let private_device_id = match device_id(&device_private_key.public_key()) {
+    let signer_public_key = signer.public_key();
+    let private_device_id = match device_id(&signer_public_key) {
         Ok(value) => value,
         Err(error) => return Decision::deny(DecisionCode::DeviceProofFailed, error.0),
     };
     if private_device_id != device.device_id {
         return Decision::deny(
             DecisionCode::DeviceProofFailed,
-            "device signing key does not match the authorized device",
+            "device signer does not match the authorized device",
         );
     }
 
     let mut challenge = [0_u8; 32];
     OsRng.fill_bytes(&mut challenge);
-    let proof = match sign_device_proof(
-        &device_private_key,
+    let proof = match device_signer::sign_device_proof(
+        signer.as_ref(),
         challenge,
         asset_id,
         deed.owner_id,
         device.device_id,
     ) {
         Ok(value) => value,
-        Err(error) => return Decision::deny(DecisionCode::DeviceProofFailed, error.0),
+        Err(error) => return Decision::deny(DecisionCode::DeviceProofFailed, error),
     };
     if let Err(error) = verify_device_proof(
         &proof,
