@@ -2,7 +2,7 @@
 
 This directory holds the technical DADE 1 specification work.
 
-The specification is intentionally small right now. We are still deciding parts of the ownership and security model, and some implementation details may stay private until Pajic finishes intellectual property review.
+DADE 1 is a working draft. The core ownership verification path now exists in both the Python reference implementation and the native VICE provider, but the protocol is not frozen and some implementation details may stay private until Pajic finishes intellectual property review.
 
 ## Current drafts
 
@@ -25,7 +25,7 @@ The specification is intentionally small right now. We are still deciding parts 
 - [Trust update schema](trust-updates.cddl)
 - [Application verification](application-verification.md)
 
-The logical deed model and first signed wire format now have a working reference verifier.
+The logical deed model and signed wire format have a working reference verifier.
 
 The identity drafts define a separate owner anchor, controller keys, and personal device keys so a device can use owned content without becoming the owner or receiving the owner's main private key.
 
@@ -40,6 +40,10 @@ The application verification draft composes those layers into one local decision
 The first technical profile uses deterministic CBOR, COSE_Sign1, and ES256. The wire-format draft proposes `.ddc` as the three-character portable deed extension. The recovery draft proposes `.drb` for an exported recovery bundle.
 
 The reference work includes a complete offline test chain from issuer root to signing key to deed, then from deed to owner anchor to controller to personal device to a fresh launch proof. Recovery adds a separate path for restoring the same owner anchor when every normal controller is unavailable. Trust snapshots add portable signed updates for later compromise information. The application verifier turns those checks into one stable result for application code.
+
+The native VICE provider implements the same decision boundary in Rust and uses Python-generated cross-language fixtures as a conformance oracle. Native CI currently covers macOS ARM64 and Windows x64.
+
+The next hardening step is a retail-style VICE vertical slice. That work must bind the DADE asset ID into protected shipping metadata and move device signing to hardware-backed storage where the platform supports it.
 
 These choices are still draft until broader implementation and security review prove them.
 
@@ -78,6 +82,6 @@ DADE should separate the protocol from Pajic's hosted services so an existing de
 
 No protocol version has been frozen.
 
-The first encoding, signature, wire-format, identity, device, issuer-trust, recovery, trust-update, and application-verification models are proposed, not final.
+The first encoding, signature, wire-format, identity, device, issuer-trust, recovery, trust-update, application-verification, and native VICE integration models are proposed, not final.
 
 No production implementation should claim DADE 1 conformance yet.
