@@ -41,8 +41,10 @@ jobs:
         include:
           - name: macOS ARM64 provider
             os: macos-15
+            platform: macos
           - name: Windows x64 provider
             os: windows-2025
+            platform: windows
 
     runs-on: ${{ matrix.os }}
     env:
@@ -81,3 +83,9 @@ jobs:
 
       - name: Check packaged provider
         run: python -c "from pathlib import Path; files=list(Path('native/vice-provider/dist').iterdir()); assert len(files)==1 and files[0].name.startswith('dade_provider.'), files"
+
+      - name: Generate retail-style ownership fixture
+        run: python reference/python/generate_retail_slice.py native/vice-provider/retail-fixture --asset-id com.pajic.dade.stagej --platform ${{ matrix.platform }} --development-file-signer
+
+      - name: Verify packaged provider with retail fixture
+        run: python reference/python/check_native_retail_slice.py native/vice-provider/retail-fixture/install/dade-home ${{ matrix.platform }} native/vice-provider/dist com.pajic.dade.stagej
