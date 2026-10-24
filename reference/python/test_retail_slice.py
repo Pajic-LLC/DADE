@@ -7,8 +7,9 @@ from pathlib import Path
 from cryptography.hazmat.primitives.asymmetric import ec
 
 import generate_retail_slice as retail
+import stage_vice_provider
 from dade_app import DecisionCode, LocalArtifacts, can_use
-from dade_identity import device_id, owner_id
+from dade_identity import device_id
 
 
 CHALLENGE = bytes.fromhex("42" * 32)
@@ -110,6 +111,27 @@ class RetailSliceFixtureTests(unittest.TestCase):
                     development_file_signer=True,
                     force=False,
                 )
+
+    def test_provider_staging_helper_is_create_only_by_default(self) -> None:
+        with tempfile.TemporaryDirectory() as temporary:
+            root = Path(temporary)
+            provider_directory = root / "provider"
+            game_output = root / "game"
+            provider_directory.mkdir()
+            game_output.mkdir()
+            source = provider_directory / "dade_provider.test"
+            source.write_bytes(b"provider-binary")
+
+            destination = stage_vice_provider.stage(provider_directory, game_output, force=False)
+            self.assertEqual(destination, game_output / "modules" / source.name)
+            self.assertEqual(destination.read_bytes(), b"provider-binary")
+
+            with self.assertRaises(FileExistsError):
+                stage_vice_provider.stage(provider_directory, game_output, force=False)
+
+            source.write_bytes(b"replacement")
+            replaced = stage_vice_provider.stage(provider_directory, game_output, force=True)
+            self.assertEqual(replaced.read_bytes(), b"replacement")
 
 
 if __name__ == "__main__":
