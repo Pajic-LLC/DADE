@@ -40,6 +40,7 @@ impl DeviceSigner for FileDeviceSigner {
     }
 }
 
+#[derive(Debug)]
 enum SignerLocator {
     FilePkcs8,
     MacosSecureEnclave { application_label: Vec<u8> },
@@ -112,7 +113,7 @@ mod macos {
 
     impl DeviceSigner for SecureEnclaveDeviceSigner {
         fn public_key(&self) -> PublicKey {
-            self.public_key
+            self.public_key.clone()
         }
 
         fn sign(&self, message: &[u8]) -> Result<[u8; 64], String> {
@@ -240,6 +241,7 @@ pub fn sign_device_proof(
 #[cfg(test)]
 mod tests {
     use super::*;
+    use rand_core::RngCore;
     use std::io::Write;
 
     fn temporary_home(name: &str) -> std::path::PathBuf {
