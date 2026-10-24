@@ -108,9 +108,17 @@ com.pajic.dade.stagej
 
 Stage the project through the normal VICE build flow. Staged VICE executables carry the DADE requirement and asset ID in the package metadata stamped into the executable. The loose `dade.asset` authoring file is not the staged runtime enforcement switch.
 
-Copy the packaged native DADE provider into the staged runtime `modules` directory.
+Until VICE stages the DADE provider automatically, install the already packaged provider with the repeatable helper:
 
-For a retail-style artifact, apply the normal platform code signature only after VICE has written its package metadata. The package stamp detects missing or changed DADE metadata; platform signing is the outer integrity boundary for the final executable.
+```sh
+python reference/python/stage_vice_provider.py \
+  native/vice-provider/dist \
+  <vice-game-output>
+```
+
+The helper copies the one packaged `dade_provider` library into the staged runtime `modules` directory and refuses to replace an existing provider unless `--force` is passed. Automatic VICE-side staging is tracked separately so this helper can go away once the editor owns that step.
+
+For a retail-style artifact, apply the normal platform code signature only after VICE has written its package metadata and the DADE provider has been staged. The package stamp detects missing or changed DADE metadata; platform signing is the outer integrity boundary for the final executable.
 
 ## 6. Run offline
 
@@ -154,7 +162,7 @@ After sequence 2 has been remembered, restoring sequence 1 must be rejected as `
 
 ## 10. What remains manual
 
-CI can verify the reference chain, native builds, descriptor parsing, platform API compilation, and development signer behavior. It cannot prove that a hosted runner has a usable personal Secure Enclave or TPM for the exact retail flow.
+CI can verify the reference chain, native builds, descriptor parsing, platform API compilation, generated retail ownership state, and the packaged provider against that generated state. It cannot prove that a hosted runner has a usable personal Secure Enclave or TPM for the exact retail flow.
 
 Before Stage J hardware work is called complete, run this procedure on:
 
